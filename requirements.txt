@@ -1,5 +1,12 @@
-numpy>=2.3.0
-scipy>=1.16.0
-matplotlib>=3.10.0
+# Python 3.13.5 compatible requirements (2025)
+numpy>=2.3.2
+scipy>=1.16.1
+matplotlib>=3.10.5
 networkx>=3.5
-pytest>=8.4.0
+pytest>=8.4.1
+
+# Additional 2025 neuromorphic computing tools
+# Uncomment if using specific neuromorphic frameworks:
+# intel-nxsdk>=1.0.0  # Intel Loihi 3 SDK
+# akida>=2.0  # BrainChip Akida 2 SDK
+# synsense-sdk>=1.0  # SynSense tools

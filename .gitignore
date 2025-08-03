@@ -123,8 +123,13 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Simulation outputs
-*.png
+# Simulation outputs (keep example outputs for documentation)
+*_demo.png
+cortical_column_simulation.png
+# Keep documentation images
+!simple_example_output.png
+!example_*.png
+!docs/*.png
 *.jpg
 *.jpeg
 *.gif
@@ -177,6 +182,18 @@ docs/build/
 experiments/
 data/
 results/
+
+# Windows temporary directories
+$Temp/
+$RECYCLE.BIN/
+
+# Neuromorphic simulation cache
+simulation_cache/
+*.cache
+
+# Hardware interface files
+hardware_logs/
+*.hardware_log
 
 # AWS credentials
 .aws/

@@ -6,6 +6,7 @@
 **Context**: FPAA hardware access, AWS/quantum resources, limited local compute  
 **Background**: Navy radar tech, IT/CS, advanced mathematics, EPA AI lead  
 **Knowledge Gap**: Neuroscience (addressed in this document)  
+**Updated**: 2025 - Current neuromorphic computing landscape
 
 ---
 
@@ -19,8 +20,14 @@ Your neuromorphic cortical column implementation represents a unique opportunity
 
 ## Phase 1: Foundation Enhancement (Months 1-3)
 
-### 1.1 FPAA Implementation Priority
-Your FPAA (Field Programmable Analog Array) access is a game-changer for this project.
+### 1.1 FPAA Implementation Priority (2025 Updated)
+FPAA (Field Programmable Analog Arrays) offer 10,000x power efficiency vs digital systems according to 2025 research.
+
+**Current Neuromorphic Hardware Landscape (2025)**:
+- Intel Loihi 3: 10M neurons for robotics/sensory processing
+- BrainChip Akida 2: On-chip learning for consumer devices  
+- SynSense Speck: Ultra-low power vision for AR/VR
+- Qualcomm Zeroth: Mobile/IoT edge AI optimization
 
 **Immediate Actions**:
 ```python

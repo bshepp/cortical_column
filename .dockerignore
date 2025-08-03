@@ -1,0 +1,145 @@
+# .dockerignore for Neuromorphic Cortical Column
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Git files
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Operating system files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$Temp/
+$RECYCLE.BIN/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+cover/
+
+# Documentation
+docs/_build/
+docs/build/
+
+# Simulation outputs (keep only essential examples)
+*_demo.png
+cortical_column_simulation.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+*.svg
+
+# Data files
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.bak
+
+# Research data directories
+experiments/
+data/
+results/
+simulation_cache/
+*.cache
+
+# Hardware interface files
+hardware_logs/
+*.hardware_log
+*.fpaa
+*.adc
+*.dac
+*.hex
+*.bin
+
+# SPICE simulation files
+*.cir
+*.raw
+*.ac
+*.op
+*.tr
+*.sp
+*.net
+
+# Circuit design files
+*.sch
+*.pcb
+*.gerber
+*.drill
+
+# AWS and credentials
+.aws/
+credentials
+config
+local_config.py
+settings_local.py
+
+# Node modules (if any JavaScript tools are added)
+node_modules/
+npm-debug.log*
+
+# Large files that shouldn't be in containers
+*.tar.gz
+*.zip
+*.rar

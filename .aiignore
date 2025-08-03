@@ -1,0 +1,121 @@
+# .aiignore for AI code assistants
+# Exclude large files and sensitive data from AI analysis
+
+# Virtual environments (too large for AI context)
+venv/
+.venv/
+env/
+ENV/
+
+# Binary and compiled files
+*.so
+*.dll
+*.dylib
+*.exe
+*.bin
+*.hex
+
+# Large data files
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.parquet
+
+# Image and media files (unless specifically needed for analysis)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.pdf
+*.mp4
+*.avi
+*.mov
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files (can be very large)
+*.log
+*.out
+
+# Cache directories
+__pycache__/
+.pytest_cache/
+.cache/
+simulation_cache/
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+$Temp/
+$RECYCLE.BIN/
+
+# Large documentation builds
+docs/_build/
+docs/build/
+
+# Research data directories (likely to contain large datasets)
+experiments/
+data/
+results/
+
+# Hardware-specific files that AI doesn't need to analyze
+*.fpaa
+*.adc
+*.dac
+*.cir
+*.raw
+*.ac
+*.op
+*.tr
+*.sp
+*.net
+*.sch
+*.pcb
+*.gerber
+*.drill
+
+# Credentials and sensitive configuration
+.aws/
+credentials
+config
+.env
+local_config.py
+settings_local.py
+*.key
+*.pem
+*.cert
+
+# IDE workspace files (not relevant for code analysis)
+.vscode/settings.json
+.vscode/launch.json
+.idea/workspace.xml
+.idea/tasks.xml
+*.sublime-workspace
