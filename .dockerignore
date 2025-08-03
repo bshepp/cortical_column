@@ -75,11 +75,18 @@ docs/build/
 # Simulation outputs (keep only essential examples)
 *_demo.png
 cortical_column_simulation.png
+*_output.png
+*_analysis.png
+*_comparison.png
 *.jpg
 *.jpeg
 *.gif
 *.pdf
 *.svg
+
+# Keep essential documentation only
+!simple_example_output.png
+!README_*.png
 
 # Data files
 *.csv
@@ -99,10 +106,23 @@ cortical_column_simulation.png
 
 # Research data directories
 experiments/
+experiments_*/
 data/
 results/
 simulation_cache/
+analysis_output/
+benchmark_results/
+parameter_sweeps/
+learning_curves/
+consciousness_metrics/
 *.cache
+*.profile
+
+# Configuration variants (only include default)
+config_*.py
+!config.py
+local_config.json
+user_config.yaml
 
 # Hardware interface files
 hardware_logs/

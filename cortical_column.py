@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from config import CorticalConfig, DEFAULT_CONFIG, LayerParameters
 
 
+# Legacy LayerConfig for backward compatibility - use config.py instead
 @dataclass
 class LayerConfig:
     """Configuration parameters for each cortical layer."""
@@ -59,7 +61,7 @@ class AnalogLayer(ABC):
     @abstractmethod
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Define the differential equation for layer dynamics."""
-        pass
+        raise NotImplementedError("Subclasses must implement dynamics method")
     
     def update(self, dt: float, inputs: np.ndarray, field_input: np.ndarray = None):
         """Update layer state using numerical integration."""
@@ -87,7 +89,9 @@ class Layer1(AnalogLayer):
     def __init__(self, config: LayerConfig, size: int = 64):
         super().__init__(config, size)
         self.phase_detector = np.zeros(size)
-        self.delay_line = np.zeros((size, 10))  # 10-step delay
+        # Use configurable delay steps instead of hardcoded 10
+        delay_steps = getattr(DEFAULT_CONFIG.integration, 'l1_delay_steps', 10)
+        self.delay_line = np.zeros((size, delay_steps))
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """High-impedance integrative modulator with phase sensitivity."""
@@ -95,7 +99,8 @@ class Layer1(AnalogLayer):
         lateral_input = np.dot(self.lateral_connections, state) * self.config.coupling_strength
         
         # Phase-sensitive field coupling
-        phase_modulation = np.sin(2 * np.pi * 0.1 * t) * self.field_coupling
+        phase_freq = DEFAULT_CONFIG.oscillations['L1_phase_freq']
+        phase_modulation = np.sin(2 * np.pi * phase_freq * t) * self.field_coupling
         
         # Delayed feedback
         delayed_input = self.delay_line[:, -1]
@@ -172,8 +177,15 @@ class Layer4(AnalogLayer):
         # Edge detection
         edge_input = np.gradient(inputs) * 0.5
         
-        # Bandpass filtering (simplified for real-time)
-        filtered_input = inputs * (1 + np.sin(2 * np.pi * np.linspace(0.1, 10, self.size) * t))
+        # Frequency-selective processing (each neuron responds to different frequencies)
+        center_freqs = np.logspace(0, 2, self.size)  # 1-100 Hz
+        filtered_input = np.zeros_like(inputs)
+        
+        for i, freq in enumerate(center_freqs):
+            # Each neuron is tuned to a specific frequency
+            # Simple resonance model: responds best to inputs at its preferred frequency
+            resonance = 1.0 / (1.0 + abs(freq - 10.0) / 10.0)  # Peak at 10 Hz, falloff
+            filtered_input[i] = inputs[i] * resonance
         
         # Thalamic relay simulation
         thalamic_relay = self.config.gain * filtered_input
@@ -195,11 +207,11 @@ class Layer5(AnalogLayer):
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Pulse-driven motor output with burst detection."""
-        # Integration of inputs from L2/3 and L4
-        self.integration_buffer += inputs * 0.1
+        # Integration of inputs from L2/3 and L4 (increased integration rate)
+        self.integration_buffer += inputs * 0.5
         
-        # Burst detection mechanism
-        burst_threshold = 0.7
+        # Burst detection mechanism (lowered threshold for realistic triggering)
+        burst_threshold = 0.1
         burst_mask = (self.integration_buffer > burst_threshold).astype(float)
         
         # Positive feedback for burst generation
@@ -261,7 +273,8 @@ class CorticalColumn:
     
     Implements biologically-inspired neuromorphic processing compatible with
     2025 hardware platforms (Intel Loihi 3, BrainChip Akida 2, SynSense Speck).
-    Provides 10,000x power efficiency potential when deployed on FPAA hardware.
+    Analog implementations can provide significant power efficiency improvements
+    over digital processing for specific workloads.
     """
     
     def __init__(self, size: int = 64):
@@ -274,11 +287,11 @@ class CorticalColumn:
     def _create_layers(self) -> Dict[str, AnalogLayer]:
         """Create all six layers with appropriate configurations."""
         configs = {
-            'L1': LayerConfig('L1', tau=50, threshold=0.5, gain=0.5, coupling_strength=0.1, noise_level=0.01),
-            'L2/3': LayerConfig('L2/3', tau=20, threshold=0.6, gain=1.0, coupling_strength=0.3, noise_level=0.02),
-            'L4': LayerConfig('L4', tau=10, threshold=0.4, gain=1.5, coupling_strength=0.2, noise_level=0.015),
-            'L5': LayerConfig('L5', tau=15, threshold=0.7, gain=2.0, coupling_strength=0.1, noise_level=0.01),
-            'L6': LayerConfig('L6', tau=30, threshold=0.5, gain=0.8, coupling_strength=0.15, noise_level=0.01)
+            'L1': LayerConfig('L1', tau=50, threshold=0.3, gain=1.0, coupling_strength=0.2, noise_level=0.01),
+            'L2/3': LayerConfig('L2/3', tau=20, threshold=0.4, gain=2.0, coupling_strength=0.4, noise_level=0.02),
+            'L4': LayerConfig('L4', tau=10, threshold=0.2, gain=3.0, coupling_strength=0.3, noise_level=0.015),
+            'L5': LayerConfig('L5', tau=15, threshold=0.3, gain=4.0, coupling_strength=0.2, noise_level=0.01),
+            'L6': LayerConfig('L6', tau=30, threshold=0.3, gain=1.5, coupling_strength=0.25, noise_level=0.01)
         }
         
         return {

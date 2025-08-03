@@ -1,0 +1,89 @@
+# .vscodeignore for neuromorphic cortical column project
+# Files and directories to exclude from VSCode file explorer/search
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Large data directories
+simulation_cache/
+analysis_output/
+benchmark_results/
+experiments/
+experiments_*/
+data/
+results/
+parameter_sweeps/
+learning_curves/
+consciousness_metrics/
+
+# Generated outputs
+*_demo.png
+cortical_column_simulation.png
+*_output.png
+*_analysis.png
+*_comparison.png
+
+# Hardware logs
+hardware_logs/
+fpaa_logs/
+neuromorphic_logs/
+*.hardware_log
+*.fpaa_log
+
+# Binary and compiled files
+*.so
+*.dll
+*.dylib
+*.exe
+*.bin
+
+# Large media files
+*.mp4
+*.avi
+*.mov
+*.tar.gz
+*.zip
+*.rar
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+$Temp/
+$RECYCLE.BIN/
+
+# Documentation builds
+docs/_build/
+docs/build/
+
+# Configuration variants
+config_*.py
+!config.py
+local_config.json
+user_config.yaml
+
+# AWS and credentials
+.aws/
+credentials
+*.key
+*.pem

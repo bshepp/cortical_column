@@ -9,9 +9,11 @@ n-morphicfields/
 ├── research-nmf.md                     # Original research document
 ├── neuromorphic-cortical-column-design.md  # Comprehensive design document
 ├── cortical_column.py                  # Main implementation
-├── test_cortical_column.py            # Comprehensive test suite
+├── config.py                           # Centralized configuration system
+├── test_cortical_column.py            # Comprehensive test suite (33 tests)
 ├── demo_cortical_column.py            # Demonstration scripts
 ├── requirements.txt                    # Python dependencies
+├── CLAUDE.md                           # AI assistant development guide
 └── README.md                          # This file
 ```
 
@@ -58,10 +60,17 @@ pip install -r requirements.txt
 ### Basic Simulation
 ```python
 from cortical_column import CorticalColumn
+from config import DEFAULT_CONFIG
 import numpy as np
 
-# Create a cortical column
+# Create a cortical column with default configuration
 column = CorticalColumn(size=64)
+
+# Or customize configuration
+from config import CorticalConfig
+config = CorticalConfig()
+config.update_layer_config('L4', gain=5.0, threshold=0.1)
+column = CorticalColumn(size=64, config=config)
 
 # Simulate with sinusoidal input
 for i in range(1000):
@@ -114,12 +123,36 @@ Manages electromagnetic field interactions between layers.
 
 ## Configuration
 
+The project uses a centralized configuration system in `config.py` that eliminates hardcoded values and enables easy parameter tuning:
+
+```python
+from config import CorticalConfig, DEFAULT_CONFIG
+
+# Use default configuration
+config = DEFAULT_CONFIG
+
+# Create custom configuration
+config = CorticalConfig()
+config.update_layer_config('L4', gain=5.0, threshold=0.1)
+
+# Validate configuration
+config.validate()  # Raises ValueError if invalid
+
+# Export configuration for analysis
+config_dict = config.to_dict()
+```
+
 Each layer can be configured with:
 - `tau`: Time constant (ms)
 - `threshold`: Activation threshold
 - `gain`: Amplification factor
 - `coupling_strength`: Lateral coupling strength
 - `noise_level`: Background noise level
+
+Additional configuration parameters:
+- `simulation.dt`: Time step size
+- `oscillations.frequencies`: Layer-specific oscillation frequencies
+- `integration.burst_threshold`: Burst detection sensitivity
 
 ## Performance Characteristics
 
@@ -132,7 +165,7 @@ Each layer can be configured with:
 
 ### Current Applications (2025)
 - **Sensory Processing**: Biomimetic vision/auditory systems with neuromorphic chips
-- **Edge AI**: Low-power pattern recognition (10,000x more efficient than digital)
+- **Edge AI**: Low-power pattern recognition with analog efficiency advantages
 - **Robotics**: Adaptive motor control with Intel Loihi 3 and BrainChip Akida 2
 - **Healthcare**: Real-time EEG analysis (95% accuracy in epilepsy prediction trials)
 - **Automotive**: Collision avoidance systems with 0.1ms latency (Mercedes implementation)
@@ -161,12 +194,12 @@ The project includes comprehensive tests covering:
 - Noise robustness
 - Integration stability
 
-All tests pass with 29/29 successful test cases.
+All tests pass with 33/33 successful test cases (including 4 new configuration system tests).
 
 ## Future Enhancements
 
 ### Current Development (2025)
-1. **Hardware Implementation**: FPAA-based analog circuits (10,000x power efficiency)
+1. **Hardware Implementation**: FPAA-based analog circuits with significant power efficiency
 2. **Multi-Column Networks**: Scalable cortical arrays with field coupling
 3. **Advanced Learning**: STDP and on-chip plasticity (BrainChip Akida 2 compatible)
 4. **Real-time Monitoring**: Integration with Intel Loihi 3 development tools

@@ -83,8 +83,15 @@ docs/build/
 
 # Research data directories (likely to contain large datasets)
 experiments/
+experiments_*/
 data/
 results/
+simulation_cache/
+analysis_output/
+benchmark_results/
+parameter_sweeps/
+learning_curves/
+consciousness_metrics/
 
 # Hardware-specific files that AI doesn't need to analyze
 *.fpaa
@@ -101,6 +108,18 @@ results/
 *.pcb
 *.gerber
 *.drill
+*.hardware_log
+*.fpaa_log
+
+# Profiling and performance data
+*.profile
+*.perf
+*.prof
+
+# Configuration variants (AI should focus on main config)
+config_*.py
+local_config.json
+user_config.yaml
 
 # Credentials and sensitive configuration
 .aws/

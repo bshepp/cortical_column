@@ -11,6 +11,7 @@ from cortical_column import (
     CorticalColumn, Layer1, Layer23, Layer4, Layer5, Layer6,
     FieldCoupling, LayerConfig, AnalogLayer
 )
+from config import CorticalConfig, DEFAULT_CONFIG
 
 
 class TestLayerConfig:
@@ -529,6 +530,51 @@ class TestIntegration:
             # Check system doesn't diverge
             assert np.all(np.isfinite(outputs))
             assert np.std(outputs) < 10  # Reasonable output variance
+
+
+class TestConfiguration:
+    """Test configuration system."""
+    
+    def test_config_validation(self):
+        """Test configuration validation."""
+        config = CorticalConfig()
+        assert config.validate() == True
+        
+        # Test invalid configuration
+        config.simulation.dt = -1.0  # Invalid negative time step
+        with pytest.raises(ValueError):
+            config.validate()
+    
+    def test_layer_config_update(self):
+        """Test layer configuration updates."""
+        config = CorticalConfig()
+        
+        # Update L4 configuration
+        config.update_layer_config('L4', gain=5.0, threshold=0.1)
+        
+        assert config.layers['L4'].gain == 5.0
+        assert config.layers['L4'].threshold == 0.1
+        
+        # Test invalid layer name
+        with pytest.raises(ValueError):
+            config.update_layer_config('L99', gain=1.0)
+    
+    def test_config_export(self):
+        """Test configuration export."""
+        config = CorticalConfig()
+        config_dict = config.to_dict()
+        
+        assert 'simulation' in config_dict
+        assert 'layers' in config_dict
+        assert 'oscillations' in config_dict
+        assert 'integration' in config_dict
+    
+    def test_default_config_access(self):
+        """Test accessing default configuration."""
+        # Should be able to access DEFAULT_CONFIG
+        assert DEFAULT_CONFIG.simulation.dt == 0.001
+        assert 'L4' in DEFAULT_CONFIG.layers
+        assert DEFAULT_CONFIG.layers['L4'].gain == 3.0
 
 
 if __name__ == "__main__":
