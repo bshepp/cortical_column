@@ -79,24 +79,25 @@ pip install -r requirements.txt
 - State updates use Euler integration for real-time performance
 
 ### Simulation Flow
-1. **Step-based simulation**: `CorticalColumn.step()` processes one time step
+1. **Step-based simulation**: `CorticalColumn.step()` processes one time step; `dt` is in seconds and layer `tau` values are in milliseconds (internally converted)
 2. **Layer updating order**: L4 → L2/3 → L5 → L6 → L1
 3. **Field coupling**: Computed between all layers using `FieldCoupling` class
 4. **Modulation**: L1 applies top-down modulation to L2/3 and L5
 
 ### Configuration
-- Default time step: 1ms (`dt = 0.001`)
+- Default time step: 1 ms (`dt = 0.001` seconds)
 - Default column size: 64 neurons per layer
-- Layer-specific time constants range from 10ms (L4) to 50ms (L1)
+- Layer-specific time constants range from 10 ms (L4) to 50 ms (L1)
+- `integration` block centralizes pathway gains and layer behaviors (e.g., `l23_from_l4_gain`, `l5_integration_rate`, `l1_modulation_gain`)
 
 ## Key Implementation Details
 
 ### Biologically-Inspired Features
-- **Hebbian Learning**: Implemented in Layer 2/3 with spike-timing dependent plasticity
-- **Sparse Coding**: Selective activation using thresholds in Layer 2/3
-- **Burst Firing**: Layer 5 generates burst patterns for motor output
+- **Hebbian Learning**: Implemented in Layer 2/3 with spike-timing dependent plasticity; learning rate and decay are configurable
+- **Sparse Coding**: Selective activation using thresholds in Layer 2/3 (configurable)
+- **Burst Firing & PWM**: Layer 5 generates burst patterns and a time-based PWM motor signal with leaky integration
 - **Field Coupling**: Electromagnetic-like interactions between layers using distance-based decay
-- **Feedback Control**: Layer 6 provides timing regulation and inhibitory modulation
+- **Feedback Control**: Layer 6 provides timing regulation via an oscillator advanced by `dt` and configurable gains
 
 ### Performance Characteristics
 - Real-time capable simulation (runs faster than biological time)

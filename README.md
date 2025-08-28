@@ -31,6 +31,9 @@ n-morphicfields/
 - Configurable time constants, thresholds, and coupling strengths
 - Realistic noise modeling and nonlinear activation functions
 - Field coupling mechanisms between layers
+- Consistent time/units: dt in seconds (default 0.001s), τ in milliseconds (internally converted)
+- Layer 4: true bandpass filtering (Butterworth SOS per neuron) + temporal edge detection
+- Layer 5: time-based PWM carrier and leaky input integration
 
 ### 3. Biologically-Inspired Features
 - **Hebbian Learning**: Spike-timing dependent plasticity in L2/3
@@ -53,6 +56,10 @@ venv\Scripts\activate     # Windows
 
 # Install dependencies (2025 latest versions)
 pip install -r requirements.txt
+
+# Or use Makefile helpers
+make install       # create venv and install
+make test          # run the test suite
 ```
 
 ## Usage
@@ -148,11 +155,13 @@ Each layer can be configured with:
 - `gain`: Amplification factor
 - `coupling_strength`: Lateral coupling strength
 - `noise_level`: Background noise level
+ - `learning_rate`, `weight_decay` (where applicable)
+ - `sparse_threshold`, `burst_threshold` (where applicable)
 
 Additional configuration parameters:
-- `simulation.dt`: Time step size
-- `oscillations.frequencies`: Layer-specific oscillation frequencies
-- `integration.burst_threshold`: Burst detection sensitivity
+- `simulation.dt`: Time step size in seconds
+- `oscillations`: Layer-specific oscillation frequencies (e.g., `L5_carrier_freq`, `L6_oscillator_freq`)
+- `integration`: Centralized gains and rates (see `config.py`)
 
 ## Performance Characteristics
 
@@ -194,7 +203,13 @@ The project includes comprehensive tests covering:
 - Noise robustness
 - Integration stability
 
-All tests pass with 33/33 successful test cases (including 4 new configuration system tests).
+All tests pass with 33/33 successful test cases. You can run them with:
+
+```bash
+make test
+# or
+./venv/bin/python -m pytest -q
+```
 
 ## Future Enhancements
 

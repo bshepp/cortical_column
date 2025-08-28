@@ -5,6 +5,22 @@ All notable changes to the Neuromorphic Cortical Column project will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-08-27
+
+### Core math and configuration cleanup
+- Time/units consistency: `dt` in seconds; `tau` in milliseconds with conversion in dynamics
+- Passed real simulation time `t` into all dynamics; fixed L6 oscillator to advance with `dt`
+- Noise scaled by sqrt(dt) for time-step consistency
+- Layer 4 now uses true bandpass filtering (Butterworth SOS per neuron) and temporal edge detection
+- Layer 5 now uses a time-based PWM carrier and leaky input integration; duty cycle derived from state
+- Removed hardcoded constants; routed gains, thresholds, and rates through `config.py` (`integration` block)
+
+### Documentation updates
+- README and CLAUDE.md updated to reflect time/units, L4/L5 implementations, and Makefile helpers
+
+### Tests
+- Existing suite remains green (33/33). Minor warning remains for sigmoid overflow at extreme inputs (benign).
+
 ## [2.1.0] - 2025-08-03
 
 ### Major Code Quality Improvements

@@ -63,24 +63,44 @@ class AnalogLayer(ABC):
         """Define the differential equation for layer dynamics."""
         raise NotImplementedError("Subclasses must implement dynamics method")
     
-    def update(self, dt: float, inputs: np.ndarray, field_input: np.ndarray = None):
-        """Update layer state using numerical integration."""
+    def update(self, dt: float, inputs: np.ndarray, field_input: np.ndarray = None, t: float = 0.0):
+        """Update layer state using numerical integration.
+        
+        Parameters
+        ----------
+        dt: float
+            Simulation time step in seconds.
+        inputs: np.ndarray
+            External input vector for this layer.
+        field_input: np.ndarray | None
+            Field coupling input for this layer.
+        t: float
+            Current simulation time in seconds. Defaults to 0.0 for
+            backward compatibility in direct unit tests.
+        """
         if field_input is not None:
             self.field_coupling = field_input
             
         # Use Euler integration for real-time performance
-        dstate = self.dynamics(self.state, 0, inputs)
+        # Pass actual simulation time to dynamics for time-dependent terms
+        # Also expose dt to the layer instance for dynamics that need dt (e.g., oscillators)
+        setattr(self, 'last_dt', dt)
+        dstate = self.dynamics(self.state, t, inputs)
         self.state += dt * dstate
         
         # Apply activation function
         self.output = self._activation(self.state)
         
         # Add noise
-        self.output += np.random.normal(0, self.config.noise_level, self.size)
+        # Scale noise with sqrt(dt) for time-step consistency
+        noise_std = self.config.noise_level * np.sqrt(max(dt, 1e-12))
+        self.output += np.random.normal(0.0, noise_std, self.size)
         
     def _activation(self, x: np.ndarray) -> np.ndarray:
-        """Sigmoid activation function."""
-        return 1 / (1 + np.exp(-(x - self.config.threshold) / 0.1))
+        """Sigmoid activation function with configurable sharpness."""
+        sharpness = DEFAULT_CONFIG.integration.get('activation_sharpness', 0.1)
+        sharpness = max(float(sharpness), 1e-6)
+        return 1.0 / (1.0 + np.exp(-(x - self.config.threshold) / sharpness))
 
 
 class Layer1(AnalogLayer):
@@ -109,8 +129,9 @@ class Layer1(AnalogLayer):
         self.delay_line[:, 1:] = self.delay_line[:, :-1]
         self.delay_line[:, 0] = inputs
         
-        # Dynamics equation
-        return (-state + inputs + lateral_input + phase_modulation + delayed_input) / self.config.tau
+        # Dynamics equation (convert tau from ms to seconds)
+        tau_s = self.config.tau / 1000.0
+        return (-state + inputs + lateral_input + phase_modulation + delayed_input) / max(tau_s, 1e-9)
 
 
 class Layer23(AnalogLayer):
@@ -119,7 +140,7 @@ class Layer23(AnalogLayer):
     def __init__(self, config: LayerConfig, size: int = 64):
         super().__init__(config, size)
         self.hebbian_weights = np.random.normal(0, 0.1, (size, size))
-        self.sparse_threshold = 0.8
+        self.sparse_threshold = DEFAULT_CONFIG.layers['L2/3'].sparse_threshold
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Dense mesh of recurrently coupled integrators with sparse encoding."""
@@ -129,7 +150,7 @@ class Layer23(AnalogLayer):
         # Lateral coupling for phase-locking
         lateral_input = np.dot(self.lateral_connections, state) * self.config.coupling_strength
         
-        # Sparse coding mechanism
+        # Sparse coding mechanism (mask available for future inhibition use)
         sparse_mask = (state > self.sparse_threshold).astype(float)
         
         # Field resonance coupling
@@ -138,16 +159,18 @@ class Layer23(AnalogLayer):
         # Update Hebbian weights (simplified)
         self._update_hebbian_weights(state, inputs)
         
-        return (-state + inputs + recurrent_input + lateral_input + field_resonance) / self.config.tau
+        tau_s = self.config.tau / 1000.0
+        return (-state + inputs + recurrent_input + lateral_input + field_resonance) / max(tau_s, 1e-9)
     
     def _update_hebbian_weights(self, state: np.ndarray, inputs: np.ndarray):
         """Update Hebbian weights based on spike-timing dependent plasticity."""
-        learning_rate = 0.001
+        learning_rate = DEFAULT_CONFIG.layers['L2/3'].learning_rate
+        weight_decay = DEFAULT_CONFIG.layers['L2/3'].weight_decay
         outer_product = np.outer(state, inputs)
-        self.hebbian_weights += learning_rate * (outer_product - 0.1 * self.hebbian_weights)
+        self.hebbian_weights += learning_rate * (outer_product - weight_decay * self.hebbian_weights)
         
-        # Normalize weights
-        self.hebbian_weights = np.clip(self.hebbian_weights, -1, 1)
+        # Normalize weights to reasonable bounds
+        self.hebbian_weights = np.clip(self.hebbian_weights, -1.0, 1.0)
 
 
 class Layer4(AnalogLayer):
@@ -156,44 +179,53 @@ class Layer4(AnalogLayer):
     def __init__(self, config: LayerConfig, size: int = 64):
         super().__init__(config, size)
         self.bandpass_filters = self._create_bandpass_filters()
+        # Maintain per-neuron filter states for streaming sosfilt
+        self._sos_states = [signal.sosfilt_zi(sos) * 0.0 for sos in self.bandpass_filters]
+        # Keep previous input sample for temporal edge detection
+        self._prev_inputs = np.zeros(size)
         self.edge_detectors = np.zeros(size)
         
-    def _create_bandpass_filters(self) -> List[signal.butter]:
+    def _create_bandpass_filters(self) -> List[np.ndarray]:
         """Create array of bandpass filters for frequency selectivity."""
         filters = []
-        center_freqs = np.logspace(0, 2, self.size)  # 1-100 Hz
+        # Use configured frequency range
+        f_low, f_high = DEFAULT_CONFIG.layers['L4'].frequency_range
+        center_freqs = np.logspace(np.log10(f_low), np.log10(f_high), self.size)  # Hz
+        fs = int(round(1.0 / DEFAULT_CONFIG.simulation.dt))  # Sampling rate from dt
         
         for freq in center_freqs:
-            # Butterworth bandpass filter
-            low = freq * 0.8
-            high = freq * 1.2
-            sos = signal.butter(4, [low, high], btype='bandpass', fs=1000, output='sos')
+            # Butterworth bandpass filter with +/-20% bandwidth around center
+            low = max(freq * 0.8, 0.1)
+            high = min(freq * 1.2, fs * 0.45)
+            # Normalize for scipy by providing fs
+            sos = signal.butter(4, [low, high], btype='bandpass', fs=fs, output='sos')
             filters.append(sos)
         
         return filters
     
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
-        """Sensory front-end with edge detection and bandpass filtering."""
-        # Edge detection
-        edge_input = np.gradient(inputs) * 0.5
+        """Sensory front-end with temporal edge detection and true bandpass filtering."""
+        # Temporal edge detection (derivative wrt time) with simple scaling
+        dt = getattr(self, 'last_dt', DEFAULT_CONFIG.simulation.dt)
+        delta = inputs - self._prev_inputs
+        self._prev_inputs = inputs.copy()
+        edge_input = (delta / max(dt, 1e-9)) * DEFAULT_CONFIG.integration['edge_detection_gain']
         
-        # Frequency-selective processing (each neuron responds to different frequencies)
-        center_freqs = np.logspace(0, 2, self.size)  # 1-100 Hz
+        # Per-neuron bandpass filtering using persistent SOS states
         filtered_input = np.zeros_like(inputs)
+        for i, sos in enumerate(self.bandpass_filters):
+            # Filter a single-sample stream per neuron
+            y, self._sos_states[i] = signal.sosfilt(sos, [inputs[i]], zi=self._sos_states[i])
+            filtered_input[i] = y[-1]
         
-        for i, freq in enumerate(center_freqs):
-            # Each neuron is tuned to a specific frequency
-            # Simple resonance model: responds best to inputs at its preferred frequency
-            resonance = 1.0 / (1.0 + abs(freq - 10.0) / 10.0)  # Peak at 10 Hz, falloff
-            filtered_input[i] = inputs[i] * resonance
-        
-        # Thalamic relay simulation
+        # Thalamic relay simulation (apply gain after filtering)
         thalamic_relay = self.config.gain * filtered_input
         
         # Lateral inhibition
         lateral_input = -np.dot(self.lateral_connections, state) * self.config.coupling_strength
         
-        return (-state + thalamic_relay + edge_input + lateral_input) / self.config.tau
+        tau_s = self.config.tau / 1000.0
+        return (-state + thalamic_relay + edge_input + lateral_input) / max(tau_s, 1e-9)
 
 
 class Layer5(AnalogLayer):
@@ -204,18 +236,24 @@ class Layer5(AnalogLayer):
         self.burst_detector = np.zeros(size)
         self.integration_buffer = np.zeros(size)
         self.motor_output = np.zeros(size)
+        # Carrier phase for PWM generation
+        self._carrier_phase = np.zeros(size)
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Pulse-driven motor output with burst detection."""
-        # Integration of inputs from L2/3 and L4 (increased integration rate)
-        self.integration_buffer += inputs * 0.5
+        # Leaky integration of inputs from L2/3 and L4
+        dt = getattr(self, 'last_dt', DEFAULT_CONFIG.simulation.dt)
+        integration_rate = DEFAULT_CONFIG.integration.get('l5_integration_rate', 0.5)
+        leak_tau_s = max(self.config.tau / 1000.0, 1e-6)
+        self.integration_buffer += dt * (inputs * integration_rate - self.integration_buffer / leak_tau_s)
         
         # Burst detection mechanism (lowered threshold for realistic triggering)
-        burst_threshold = 0.1
+        burst_threshold = DEFAULT_CONFIG.layers['L5'].burst_threshold
         burst_mask = (self.integration_buffer > burst_threshold).astype(float)
         
-        # Positive feedback for burst generation
-        feedback = burst_mask * state * 0.5
+        # Positive feedback for burst generation (configurable)
+        feedback_gain = DEFAULT_CONFIG.integration.get('l5_state_feedback_gain', 0.5)
+        feedback = burst_mask * state * feedback_gain
         
         # Motor output generation
         self.motor_output = self._generate_motor_output(state, burst_mask)
@@ -223,17 +261,26 @@ class Layer5(AnalogLayer):
         # Reset integration buffer on burst
         self.integration_buffer *= (1 - burst_mask)
         
-        return (-state + self.integration_buffer + feedback) / self.config.tau
+        tau_s = self.config.tau / 1000.0
+        return (-state + self.integration_buffer + feedback) / max(tau_s, 1e-9)
     
     def _generate_motor_output(self, state: np.ndarray, burst_mask: np.ndarray) -> np.ndarray:
         """Generate motor-ready output signals."""
-        # Pulse width modulation
-        pwm_output = burst_mask * np.sin(2 * np.pi * 50 * state)  # 50 Hz carrier
-        
-        # Current driver simulation
-        current_output = np.tanh(state * 2) * burst_mask
-        
-        return pwm_output + current_output
+        # Time-based PWM carrier
+        dt = getattr(self, 'last_dt', DEFAULT_CONFIG.simulation.dt)
+        carrier_hz = DEFAULT_CONFIG.oscillations['L5_carrier_freq']
+        self._carrier_phase = (self._carrier_phase + 2 * np.pi * carrier_hz * dt) % (2 * np.pi)
+        # Duty proportional to bounded control (state projected through tanh)
+        duty = np.clip((np.tanh(state) + 1.0) / 2.0, 0.0, 1.0)
+        # Generate square PWM: 1 if phase < 2π*duty else 0, masked by bursts
+        pwm_square = (self._carrier_phase < (2 * np.pi * duty)).astype(float) * burst_mask
+        # Optional analog shaping: small ripple
+        ripple_gain = DEFAULT_CONFIG.integration.get('l5_pwm_ripple', 0.1)
+        pwm_ripple = ripple_gain * np.sin(self._carrier_phase) * burst_mask
+        # Current driver simulation proportional to control
+        current_gain = DEFAULT_CONFIG.integration.get('l5_current_gain', 2.0)
+        current_output = np.tanh(state * current_gain) * burst_mask
+        return pwm_square + pwm_ripple + current_output
 
 
 class Layer6(AnalogLayer):
@@ -243,24 +290,38 @@ class Layer6(AnalogLayer):
         super().__init__(config, size)
         self.delay_locked_loop = np.zeros(size)
         self.oscillator_phase = np.zeros(size)
-        self.feedback_strength = 0.3
+        self.feedback_strength = DEFAULT_CONFIG.integration.get('l6_feedback_strength', 0.3)
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Feedback regulator with delay-locked loops."""
         # Delay-locked loop for timing
-        self.oscillator_phase += 2 * np.pi * 0.1  # 0.1 Hz base frequency
-        timing_signal = np.sin(self.oscillator_phase) * 0.2
+        freq_hz = DEFAULT_CONFIG.oscillations['L6_oscillator_freq']
+        # Derive an effective dt: prefer explicitly provided last_dt, else
+        # use difference in t between calls, else fall back to global default dt.
+        if hasattr(self, 'last_dt') and self.last_dt is not None:
+            dt_local = float(self.last_dt)
+        else:
+            prev_t = getattr(self, '_prev_t_seen', None)
+            if prev_t is not None:
+                dt_local = max(float(t) - float(prev_t), 0.0)
+            else:
+                dt_local = float(DEFAULT_CONFIG.simulation.dt)
+            self._prev_t_seen = float(t)
+        self.oscillator_phase += 2 * np.pi * freq_hz * dt_local
+        timing_signal = np.sin(self.oscillator_phase) * DEFAULT_CONFIG.integration.get('l6_timing_amplitude', 0.2)
         
         # Inhibitory modulation
         inhibitory_gate = np.tanh(state) * self.feedback_strength
         
         # Resonance coupling
-        resonance_input = np.cos(2 * np.pi * 0.02 * t) * self.field_coupling
+        resonance_freq = DEFAULT_CONFIG.oscillations['L6_resonance_freq']
+        resonance_input = np.cos(2 * np.pi * resonance_freq * t) * self.field_coupling
         
         # Feedback to other layers (computed separately)
         feedback_output = state * inhibitory_gate
         
-        return (-state + inputs + timing_signal + resonance_input) / self.config.tau
+        tau_s = self.config.tau / 1000.0
+        return (-state + inputs + timing_signal + resonance_input) / max(tau_s, 1e-9)
     
     def get_feedback_signal(self) -> np.ndarray:
         """Get feedback signal for other layers."""
@@ -310,32 +371,39 @@ class CorticalColumn:
         field_signals = self.field_coupling.compute_field_interactions(self.layers)
         
         # Layer 4: Primary sensory input
-        self.layers['L4'].update(self.dt, sensory_input, field_signals.get('L4'))
+        self.layers['L4'].update(self.dt, sensory_input, field_signals.get('L4'), t=self.time)
         
         # Layer 2/3: Integration from L4
-        l23_input = self.layers['L4'].output * 0.8
-        self.layers['L2/3'].update(self.dt, l23_input, field_signals.get('L2/3'))
+        l23_gain = DEFAULT_CONFIG.integration.get('l23_from_l4_gain', 0.8)
+        l23_input = self.layers['L4'].output * l23_gain
+        self.layers['L2/3'].update(self.dt, l23_input, field_signals.get('L2/3'), t=self.time)
         
         # Layer 5: Output integration
-        l5_input = (self.layers['L2/3'].output * 0.6 + 
-                   self.layers['L4'].output * 0.4)
-        self.layers['L5'].update(self.dt, l5_input, field_signals.get('L5'))
+        l5_from_l23 = DEFAULT_CONFIG.integration.get('l5_from_l23_gain', 0.6)
+        l5_from_l4 = DEFAULT_CONFIG.integration.get('l5_from_l4_gain', 0.4)
+        l5_input = (self.layers['L2/3'].output * l5_from_l23 + 
+                   self.layers['L4'].output * l5_from_l4)
+        self.layers['L5'].update(self.dt, l5_input, field_signals.get('L5'), t=self.time)
         
         # Layer 6: Feedback control
-        l6_input = self.layers['L5'].output * 0.3
-        self.layers['L6'].update(self.dt, l6_input, field_signals.get('L6'))
+        l6_gain = DEFAULT_CONFIG.integration.get('l6_from_l5_gain', 0.3)
+        l6_input = self.layers['L5'].output * l6_gain
+        # Make dt available to L6 dynamics for oscillator phase advance
+        setattr(self.layers['L6'], 'last_dt', self.dt)
+        self.layers['L6'].update(self.dt, l6_input, field_signals.get('L6'), t=self.time)
         
         # Layer 1: Context modulation
         if context_input is None:
             context_input = self.layers['L6'].get_feedback_signal()
-        self.layers['L1'].update(self.dt, context_input, field_signals.get('L1'))
+        self.layers['L1'].update(self.dt, context_input, field_signals.get('L1'), t=self.time)
         
         # Apply L1 modulation to other layers
         self._apply_l1_modulation()
     
     def _apply_l1_modulation(self):
         """Apply L1 modulation to L2/3 and L5."""
-        l1_modulation = self.layers['L1'].output * 0.2
+        l1_mod_gain = DEFAULT_CONFIG.integration.get('l1_modulation_gain', 0.2)
+        l1_modulation = self.layers['L1'].output * l1_mod_gain
         self.layers['L2/3'].state += l1_modulation * self.dt
         self.layers['L5'].state += l1_modulation * self.dt
     

@@ -29,6 +29,7 @@ class LayerParameters:
     # Layer-specific parameters
     frequency_range: tuple = (1.0, 100.0)  # Hz range for frequency tuning
     learning_rate: float = 0.001  # Hebbian learning rate
+    weight_decay: float = 0.1  # Hebbian weight decay factor
     sparse_threshold: float = 0.8  # Sparse coding threshold
     burst_threshold: float = 0.1  # Burst detection threshold
     
@@ -67,7 +68,7 @@ class CorticalConfig:
             ),
             'L2/3': LayerParameters(
                 tau=20, threshold=0.4, gain=2.0, coupling_strength=0.4,
-                noise_level=0.02, learning_rate=0.001, sparse_threshold=0.8
+                noise_level=0.02, learning_rate=0.001, weight_decay=0.1, sparse_threshold=0.8
             ),
             'L4': LayerParameters(
                 tau=10, threshold=0.2, gain=3.0, coupling_strength=0.3,
@@ -98,7 +99,19 @@ class CorticalConfig:
             'l5_integration_rate': 0.5,  # Integration buffer rate
             'l6_feedback_strength': 0.3,  # Feedback modulation
             'edge_detection_gain': 0.5,  # Edge detection scaling
-            'activation_sharpness': 0.1  # Sigmoid activation steepness
+            'activation_sharpness': 0.1,  # Sigmoid activation steepness
+            # Pathway and modulation gains
+            'l23_from_l4_gain': 0.8,
+            'l5_from_l23_gain': 0.6,
+            'l5_from_l4_gain': 0.4,
+            'l6_from_l5_gain': 0.3,
+            'l1_modulation_gain': 0.2,
+            # Layer 5 specifics
+            'l5_state_feedback_gain': 0.5,
+            'l5_pwm_ripple': 0.1,
+            'l5_current_gain': 2.0,
+            # Layer 6 timing amplitude
+            'l6_timing_amplitude': 0.2,
         }
         
     def validate(self) -> bool:
