@@ -5,7 +5,7 @@ PY=$(VENV)/bin/python
 PIP=$(VENV)/bin/pip
 PYTEST=$(PY) -m pytest
 
-.PHONY: help venv install upgrade test demo sim simple clean
+.PHONY: help venv install upgrade test demo sim simple clean exp-step exp-freq exp-noise
 
 help:
 	@echo "Targets:"
@@ -17,6 +17,9 @@ help:
 	@echo "  sim      - run cortical_column.py"
 	@echo "  simple   - run simple_example.py"
 	@echo "  clean    - remove venv and __pycache__"
+	@echo "  exp-step - run step response experiment"
+	@echo "  exp-freq - run frequency sweep experiment"
+	@echo "  exp-noise- run noise sweep experiment"
 
 venv:
 	python3 -m venv $(VENV)
@@ -44,3 +47,12 @@ simple:
 clean:
 	rm -rf $(VENV)
 	rm -rf __pycache__ */__pycache__
+
+exp-step:
+	$(PY) -m experiments.runner step --steps 2000 --size 64
+
+exp-freq:
+	$(PY) -m experiments.runner freq --steps 2000 --size 64
+
+exp-noise:
+	$(PY) -m experiments.runner noise --steps 500 --size 64
