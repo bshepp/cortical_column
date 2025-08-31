@@ -5,7 +5,7 @@ PY=$(VENV)/bin/python
 PIP=$(VENV)/bin/pip
 PYTEST=$(PY) -m pytest
 
-.PHONY: help venv install upgrade test demo sim simple clean exp-step exp-freq exp-noise
+.PHONY: help venv install upgrade test demo sim simple clean exp-step exp-freq exp-noise exp-stability
 
 help:
 	@echo "Targets:"
@@ -20,6 +20,7 @@ help:
 	@echo "  exp-step - run step response experiment"
 	@echo "  exp-freq - run frequency sweep experiment"
 	@echo "  exp-noise- run noise sweep experiment"
+	@echo "  exp-stability - long-run stability experiment"
 
 venv:
 	python3 -m venv $(VENV)
@@ -56,3 +57,6 @@ exp-freq:
 
 exp-noise:
 	$(PY) -m experiments.runner noise --steps 500 --size 64
+
+exp-stability:
+	$(PY) -m experiments.runner stability --steps 10000 --size 64

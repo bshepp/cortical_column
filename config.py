@@ -112,6 +112,12 @@ class CorticalConfig:
             'l5_current_gain': 2.0,
             # Layer 6 timing amplitude
             'l6_timing_amplitude': 0.2,
+            # Stability and learning controls
+            'state_soft_clip': 10.0,  # tanh soft-clip magnitude for states
+            'l23_recurrent_gain': 0.8,  # scale recurrent input in L2/3
+            'l23_weight_radius': 0.9,  # target spectral radius for L2/3 weights
+            'l23_lr_decay': 0.0,  # optional LR decay per update step
+            'noise_on_state': True,  # inject noise in state-space instead of output
         }
         
     def validate(self) -> bool:

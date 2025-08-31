@@ -106,9 +106,53 @@ EXPERIMENTS = {
 }
 
 
+def exp_stability_long(size: int = 64, steps: int = 10000, seed: int = 0, amp: float = 1.0) -> Dict[str, Any]:
+    """Long-run stability under sustained input.
+
+    Tracks non-finite occurrences and state magnitudes across layers.
+    """
+    np.random.seed(seed)
+    column = CorticalColumn(size=size)
+    dt = column.dt
+    clip = DEFAULT_CONFIG.integration.get('state_soft_clip', 10.0)
+
+    per_layer_maxabs: Dict[str, float] = {name: 0.0 for name in column.layers.keys()}
+    clipped_counts: Dict[str, int] = {name: 0 for name in column.layers.keys()}
+    nonfinite_total = 0
+
+    for i in range(steps):
+        sensory = amp * np.ones(size)
+        column.step(sensory)
+        for name, layer in column.layers.items():
+            st = layer.state
+            # Non-finite tracking
+            nonfinite = np.sum(~np.isfinite(st))
+            nonfinite_total += int(nonfinite)
+            # Max abs
+            try:
+                per_layer_maxabs[name] = float(max(per_layer_maxabs[name], float(np.max(np.abs(st)))))
+            except Exception:
+                pass
+            # Clipped fraction (near soft clip bound)
+            clipped_counts[name] += int(np.sum(np.abs(st) > 0.95 * clip))
+
+    total_vals = steps * size
+    clipped_fraction = {name: (clipped_counts[name] / float(total_vals)) for name in clipped_counts}
+    metrics = {
+        "dt": dt,
+        "steps": steps,
+        "any_nonfinite": nonfinite_total > 0,
+        "nonfinite_total": nonfinite_total,
+        "per_layer_maxabs": per_layer_maxabs,
+        "clipped_fraction": clipped_fraction,
+        "final_output_mean": float(np.mean(column.get_output()))
+    }
+    return metrics
+
+
 def main():
     parser = argparse.ArgumentParser(description="Neuromorphic cortical column experiments")
-    parser.add_argument("experiment", choices=EXPERIMENTS.keys())
+    parser.add_argument("experiment", choices=list(EXPERIMENTS.keys()) + ["stability"]) 
     parser.add_argument("--outdir", default="results")
     parser.add_argument("--size", type=int, default=64)
     parser.add_argument("--steps", type=int, default=2000)
@@ -116,13 +160,14 @@ def main():
     args = parser.parse_args()
 
     # Run
-    fn = EXPERIMENTS[args.experiment]
     if args.experiment == "step":
-        metrics = fn(steps=args.steps, size=args.size, seed=args.seed)
+        metrics = EXPERIMENTS["step"](steps=args.steps, size=args.size, seed=args.seed)
     elif args.experiment == "freq":
-        metrics = fn(size=args.size, steps=args.steps, seed=args.seed)
+        metrics = EXPERIMENTS["freq"](size=args.size, steps=args.steps, seed=args.seed)
     elif args.experiment == "noise":
-        metrics = fn(size=args.size, steps=args.steps, seed=args.seed)
+        metrics = EXPERIMENTS["noise"](size=args.size, steps=args.steps, seed=args.seed)
+    elif args.experiment == "stability":
+        metrics = exp_stability_long(size=args.size, steps=args.steps, seed=args.seed)
     else:
         raise ValueError("Unknown experiment")
 

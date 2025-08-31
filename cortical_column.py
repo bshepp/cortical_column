@@ -87,14 +87,21 @@ class AnalogLayer(ABC):
         setattr(self, 'last_dt', dt)
         dstate = self.dynamics(self.state, t, inputs)
         self.state += dt * dstate
+        # Inject noise in state-space if configured
+        if DEFAULT_CONFIG.integration.get('noise_on_state', True):
+            sigma = self.config.noise_level * np.sqrt(max(dt, 1e-12))
+            self.state += np.random.normal(0.0, sigma, self.size)
+        # Soft-clip states to improve stability
+        clip = DEFAULT_CONFIG.integration.get('state_soft_clip', 10.0)
+        self.state = clip * np.tanh(self.state / max(clip, 1e-9))
         
         # Apply activation function
         self.output = self._activation(self.state)
         
-        # Add noise
-        # Scale noise with sqrt(dt) for time-step consistency
-        noise_std = self.config.noise_level * np.sqrt(max(dt, 1e-12))
-        self.output += np.random.normal(0.0, noise_std, self.size)
+        # Optional: post-activation noise (disabled by default)
+        if not DEFAULT_CONFIG.integration.get('noise_on_state', True):
+            noise_std = self.config.noise_level * np.sqrt(max(dt, 1e-12))
+            self.output += np.random.normal(0.0, noise_std, self.size)
         
     def _activation(self, x: np.ndarray) -> np.ndarray:
         """Sigmoid activation function with configurable sharpness."""
@@ -144,8 +151,9 @@ class Layer23(AnalogLayer):
         
     def dynamics(self, state: np.ndarray, t: float, inputs: np.ndarray) -> np.ndarray:
         """Dense mesh of recurrently coupled integrators with sparse encoding."""
-        # Recurrent connections with Hebbian learning
-        recurrent_input = np.dot(self.hebbian_weights, state)
+        # Recurrent connections with Hebbian learning (scaled)
+        recurrent_gain = DEFAULT_CONFIG.integration.get('l23_recurrent_gain', 0.8)
+        recurrent_input = recurrent_gain * np.dot(self.hebbian_weights, state)
         
         # Lateral coupling for phase-locking
         lateral_input = np.dot(self.lateral_connections, state) * self.config.coupling_strength
@@ -167,10 +175,33 @@ class Layer23(AnalogLayer):
         learning_rate = DEFAULT_CONFIG.layers['L2/3'].learning_rate
         weight_decay = DEFAULT_CONFIG.layers['L2/3'].weight_decay
         outer_product = np.outer(state, inputs)
-        self.hebbian_weights += learning_rate * (outer_product - weight_decay * self.hebbian_weights)
+        # Optional learning rate decay over time
+        step = getattr(self, '_update_step', 0) + 1
+        self._update_step = step
+        lr_decay = DEFAULT_CONFIG.integration.get('l23_lr_decay', 0.0)
+        lr_eff = learning_rate / (1.0 + lr_decay * step)
+        self.hebbian_weights += lr_eff * (outer_product - weight_decay * self.hebbian_weights)
         
-        # Normalize weights to reasonable bounds
+        # Normalize weights to reasonable bounds and spectral radius target
         self.hebbian_weights = np.clip(self.hebbian_weights, -1.0, 1.0)
+        try:
+            # Cheap spectral radius estimation via power iteration
+            v = getattr(self, '_power_iter_vec', None)
+            if v is None or v.shape[0] != state.size:
+                v = np.random.randn(state.size)
+                v /= (np.linalg.norm(v) + 1e-9)
+                setattr(self, '_power_iter_vec', v)
+            for _ in range(3):
+                v = self.hebbian_weights @ v
+                n = np.linalg.norm(v) + 1e-9
+                v = v / n
+            est_r = np.linalg.norm(self.hebbian_weights @ v)
+            target_r = DEFAULT_CONFIG.integration.get('l23_weight_radius', 0.9)
+            if est_r > 1e-6 and est_r > target_r:
+                self.hebbian_weights *= (target_r / est_r)
+            setattr(self, '_power_iter_vec', v)
+        except Exception:
+            pass
 
 
 class Layer4(AnalogLayer):
