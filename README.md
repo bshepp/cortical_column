@@ -211,6 +211,35 @@ make test
 ./venv/bin/python -m pytest -q
 ```
 
+## Experiments
+
+Minimal, reproducible experiment harness is included under `experiments/runner.py`. Results are written to `results/<experiment>/<timestamp>/metrics.json` and include a provenance block (git SHA, Python version, and full configuration).
+
+- **Run commands (Make targets)**
+  - `make exp-step`: Step response; estimates L5 τ from 63% rise; saves `tau_est_L5_s`, `final_output_mean`.
+  - `make exp-freq`: Frequency sweep; reports per-frequency output variability (`std_response`).
+  - `make exp-noise`: Noise sweep; reports `mean`/`std` per noise level (`noise_response`).
+  - `make exp-stability`: 10k-step stability under sustained input; tracks `any_nonfinite`, `per_layer_maxabs`, `clipped_fraction`, and `final_output_mean`.
+
+- **Output structure**
+```json
+{
+  "metrics": { /* experiment-specific fields as above */ },
+  "meta": {
+    "git_sha": "...",
+    "python": "...",
+    "config": { /* full DEFAULT_CONFIG snapshot */ },
+    "timestamp": "YYYY-MM-DDTHH:MM:SS"
+  }
+}
+```
+
+- **Interpretation tips**
+  - **Step**: `tau_est_L5_s` should roughly match configured time constants after pathways/gains.
+  - **Freq**: Peaks near tuned bands; off-band variance should be lower.
+  - **Noise**: Variance should increase smoothly with noise level; no NaNs/Infs.
+  - **Stability**: `any_nonfinite` must be false; `clipped_fraction` should be low (<0.05 typical).
+
 ## Future Enhancements
 
 ### Current Development (2025)
