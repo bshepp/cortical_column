@@ -99,10 +99,121 @@ def exp_noise_sweep(size: int = 64, noise_levels=(0.0, 0.1, 0.5, 1.0), steps: in
     return {"noise_response": res}
 
 
+def exp_l23_spectral(size: int = 32, steps: int = 5000, seed: int = 0) -> Dict[str, Any]:
+    """Track L2/3 spectral radius during repeated-pattern learning.
+
+    Every checkpoint, estimate spectral radius via power iteration.
+    """
+    np.random.seed(seed)
+    column = CorticalColumn(size=size)
+    layer = column.layers['L2/3']
+    dt = column.dt
+
+    # Simple repeated binary pattern
+    pattern = (np.arange(size) % 2).astype(float)
+
+    def estimate_radius(W: np.ndarray) -> float:
+        v = np.random.randn(W.shape[0])
+        v /= (np.linalg.norm(v) + 1e-9)
+        for _ in range(5):
+            v = W @ v
+            n = np.linalg.norm(v) + 1e-9
+            v = v / n
+        return float(np.linalg.norm(W @ v))
+
+    checkpoints = list(range(0, steps + 1, max(steps // 20, 1)))
+    radius_series = {}
+    for i in range(steps + 1):
+        column.step(pattern)
+        if i in checkpoints:
+            r = estimate_radius(layer.hebbian_weights)
+            radius_series[str(i)] = r
+
+    mean_abs_delta_W = float(np.mean(np.abs(layer.hebbian_weights)))
+    return {
+        "dt": dt,
+        "radius_series": radius_series,
+        "mean_abs_weight": mean_abs_delta_W,
+    }
+
+
+def exp_pwm_duty_sweep(size: int = 32, blocks: int = 11, block_steps: int = 400, seed: int = 0) -> Dict[str, Any]:
+    """Approximate PWM duty vs input amplitude monotonicity.
+
+    For a set of constant amplitudes in [0, 1], run block_steps and
+    approximate duty as the fraction of time the L5 motor output exceeds a threshold.
+    """
+    np.random.seed(seed)
+    column = CorticalColumn(size=size)
+    dt = column.dt
+    amps = np.linspace(0.0, 1.0, blocks)
+    duty_estimates = []
+    threshold = 0.2  # heuristic threshold for 'high' output
+    warmup = block_steps // 2
+    for a in amps:
+        highs = 0
+        total = 0
+        for i in range(block_steps):
+            sensory = a * np.ones(size)
+            column.step(sensory)
+            if i >= warmup:
+                mo = column.get_output()
+                highs += int(np.mean(mo) > threshold)
+                total += 1
+        duty_estimates.append(highs / float(max(total, 1)))
+
+    # Compute Spearman-like rank correlation without SciPy
+    def ranks(x: np.ndarray) -> np.ndarray:
+        return np.argsort(np.argsort(x))
+    rho = float(np.corrcoef(ranks(amps), ranks(np.array(duty_estimates)))[0, 1])
+
+    mapping = {str(round(a, 3)): float(d) for a, d in zip(amps, duty_estimates)}
+    return {"dt": dt, "duty_mapping": mapping, "spearman_rho": rho}
+
+
+def exp_l4_selectivity_map(size: int = 32, freqs=(2, 5, 10, 20, 40, 80), steps: int = 1500, seed: int = 0) -> Dict[str, Any]:
+    """Map frequency → best-responding L4 neuron index and compare to expected.
+
+    Uses per-neuron log-spaced centers from config range.
+    """
+    np.random.seed(seed)
+    column = CorticalColumn(size=size)
+    dt = column.dt
+    f_low, f_high = DEFAULT_CONFIG.layers['L4'].frequency_range
+    centers = np.logspace(np.log10(f_low), np.log10(f_high), size)
+
+    results = {}
+    for f in freqs:
+        # run with sinusoidal input
+        outputs = []
+        for i in range(steps):
+            t = i * dt
+            sensory = np.sin(2 * np.pi * f * t) * np.ones(size)
+            column.step(sensory)
+            if i > steps // 2:  # collect during steady-state
+                outputs.append(column.layers['L4'].output.copy())
+        outs = np.array(outputs)
+        # choose neuron index with max std
+        stds = np.std(outs, axis=0)
+        best_idx = int(np.argmax(stds))
+        # expected index is nearest center frequency
+        exp_idx = int(np.argmin(np.abs(centers - f)))
+        results[str(f)] = {
+            "best_idx": best_idx,
+            "expected_idx": exp_idx,
+            "index_error": abs(best_idx - exp_idx),
+        }
+
+    return {"l4_selectivity": results}
+
+
 EXPERIMENTS = {
     "step": exp_step_response,
     "freq": exp_frequency_sweep,
     "noise": exp_noise_sweep,
+    "l23_spectral": exp_l23_spectral,
+    "pwm": exp_pwm_duty_sweep,
+    "l4map": exp_l4_selectivity_map,
 }
 
 
@@ -168,6 +279,13 @@ def main():
         metrics = EXPERIMENTS["noise"](size=args.size, steps=args.steps, seed=args.seed)
     elif args.experiment == "stability":
         metrics = exp_stability_long(size=args.size, steps=args.steps, seed=args.seed)
+    elif args.experiment == "l23_spectral":
+        metrics = EXPERIMENTS["l23_spectral"](size=args.size, steps=args.steps, seed=args.seed)
+    elif args.experiment == "pwm":
+        # blocks not exposed via CLI parser; use default inside function
+        metrics = EXPERIMENTS["pwm"](size=args.size, seed=args.seed)
+    elif args.experiment == "l4map":
+        metrics = EXPERIMENTS["l4map"](size=args.size, steps=args.steps, seed=args.seed)
     else:
         raise ValueError("Unknown experiment")
 

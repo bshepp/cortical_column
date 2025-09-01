@@ -5,7 +5,7 @@ PY=$(VENV)/bin/python
 PIP=$(VENV)/bin/pip
 PYTEST=$(PY) -m pytest
 
-.PHONY: help venv install upgrade test demo sim simple clean exp-step exp-freq exp-noise exp-stability
+.PHONY: help venv install upgrade test demo sim simple clean exp-step exp-freq exp-noise exp-stability exp-l23 exp-pwm exp-l4map
 
 help:
 	@echo "Targets:"
@@ -21,6 +21,9 @@ help:
 	@echo "  exp-freq - run frequency sweep experiment"
 	@echo "  exp-noise- run noise sweep experiment"
 	@echo "  exp-stability - long-run stability experiment"
+	@echo "  exp-l23  - L2/3 spectral radius over learning"
+	@echo "  exp-pwm  - PWM duty monotonicity sweep"
+	@echo "  exp-l4map- L4 selectivity mapping"
 
 venv:
 	python3 -m venv $(VENV)
@@ -60,3 +63,12 @@ exp-noise:
 
 exp-stability:
 	$(PY) -m experiments.runner stability --steps 10000 --size 64
+
+exp-l23:
+	$(PY) -m experiments.runner l23_spectral --steps 5000 --size 32
+
+exp-pwm:
+	$(PY) -m experiments.runner pwm --blocks 11 --size 32
+
+exp-l4map:
+	$(PY) -m experiments.runner l4map --steps 1500 --size 32
