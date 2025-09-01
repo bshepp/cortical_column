@@ -215,8 +215,7 @@ cortical_column_simulation.png
 docs/_build/
 docs/build/
 
-# Research data
-experiments/
+# Research data and outputs
 data/
 results/
 
