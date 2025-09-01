@@ -240,6 +240,10 @@ Minimal, reproducible experiment harness is included under `experiments/runner.p
   - **Noise**: Variance should increase smoothly with noise level; no NaNs/Infs.
   - **Stability**: `any_nonfinite` must be false; `clipped_fraction` should be low (<0.05 typical).
 
+## Guided Tutorial
+
+See `TUTORIAL.md` for a complete, hands-on pathway from first principles to mastering the experiments and parameter tuning. It includes step-by-step exercises for step/frequency/noise/stability, learning behavior, L1 modulation, and dt/τ tradeoffs.
+
 ## Future Enhancements
 
 ### Current Development (2025)
